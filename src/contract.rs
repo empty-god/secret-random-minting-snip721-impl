@@ -7,12 +7,12 @@ use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use primitive_types::U256;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
-use std::collections::HashSet;
 
 use secret_toolkit::{
     permit::{validate, Permit, RevokedPermits},
     utils::{pad_handle_result, pad_query_result},
 };
+use crate::state::NFT_ARCHIVE;
 
 use crate::expiration::Expiration;
 use crate::inventory::{Inventory, InventoryIter};
@@ -52,7 +52,11 @@ use rand_chacha::ChaChaRng;
 use secret_toolkit::snip20::handle::{register_receive_msg, transfer_msg};
 
 /// Mint cost
-pub const MINT_COST: u128 = 55000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
+pub const MINT_COST: u128 = 200000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
+
+pub struct Attributes {
+    test: String,
+}
 
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
@@ -118,6 +122,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     // TODO remove this after BlockInfo becomes available to queries
     save(&mut deps.storage, BLOCK_KEY, &env.block)?;
+    save(&mut deps.storage, NFT_ARCHIVE, &msg.nfts)?;
 
     if msg.royalty_info.is_some() {
         store_royalties(
@@ -615,7 +620,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     let snip20_address: HumanAddr = load(&deps.storage, SNIP20_ADDRESS_KEY)?;
 
     // Checks how many tokens are left
-    let mut count: u16 = load(&deps.storage, COUNT_KEY)?;
+    let mut count: u16 = load(&deps.storage, NFT_ARCHIVE)?;
 
     if count == 0 {
         return Err(StdError::generic_err("All tokens have been minted"));
@@ -691,32 +696,37 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
 
     count = count - 1;
 
-    save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
-    save(&mut deps.storage, COUNT_KEY, &count)?;
+    // save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
+    save(&mut deps.storage, NFT_ARCHIVE, &count)?;
 
     let public_metadata = Some(Metadata {
         token_uri: None,
         extension: Some(Extension {
             image: None,
             image_data: None,
-            external_url: Some(token_data.img_url.clone()),
+            external_url: Some(swap_data[num]),
             description: None,
-            name: Some(token_data.id.clone()),
-            attributes: token_data.attributes.clone(),
+            name: Some(swap_data[num]),
+            attributes: Some(Attributes {
+                test: None,
+            }),
             background_color: None,
             animation_url: None,
             youtube_url: None,
             media: None,
             protected_attributes: None,
         }),
+        protected_attributes: todo!(),
+        media: todo!(),
+        youtube_url: todo!(),
+        animation_url: todo!(),
     });
-
     let private_metadata = Some(Metadata {
         token_uri: None,
         extension: Some(Extension {
             image: None,
             image_data: None,
-            external_url: Some(token_data.priv_img_url.clone()),
+            external_url: None,
             description: None,
             name: None,
             attributes: None,
@@ -736,18 +746,10 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         }),
     });
 
-    let serial_number = None;
-
-    let royalty_info: Option<RoyaltyInfo>;
-    let royalty_option = may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?;
-    if royalty_option == None {
-        royalty_info = None;
-    } else {
-        royalty_info = Some(royalty_option.unwrap().to_human_old(&deps.api)?);
-    }
-
+    let serial_number = Some("0001001010");
+    let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
     let memo = None;
-    let token_id: Option<String> = Some(token_data.id.clone());
+    let token_id: Option<String> = Some(num);
 
     //Set variables for response logs
     let url_str = format!("{} ", token_data.priv_img_url.clone());
@@ -770,9 +772,8 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         data: Some(to_binary(&HandleAnswer::MintNft {
             token_id: minted_str,
         })?),
-    })
+    });
 }
-
 /// Returns HandleResult
 ///
 /// sets new public and/or private metadata

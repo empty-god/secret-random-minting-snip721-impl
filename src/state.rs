@@ -78,6 +78,16 @@ pub const PREFIX_MINT_RUN_NUM: &[u8] = b"runnum";
 /// prefix for the storage of revoked permits
 pub const PREFIX_REVOKED_PERMITS: &str = "revoke";
 
+/// log for avaliable nfts
+pub const NFT_ARCHIVE: &[u8] = b"nftimages";
+
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
+pub struct NftArchive {
+    /// array of avaliable nfts
+    pub nfts: Vec<String>
+}
+
+
 /// Token contract config
 #[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
 pub struct Config {

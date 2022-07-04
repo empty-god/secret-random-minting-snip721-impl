@@ -25,6 +25,10 @@ pub struct Metadata {
     pub token_uri: Option<String>,
     /// optional on-chain metadata.  Only use this if you are not using `token_uri`
     pub extension: Option<Extension>,
+    pub(crate) protected_attributes: Option<_>,
+    pub(crate) media: Option<_>,
+    pub(crate) youtube_url: Option<_>,
+    pub(crate) animation_url: Option<_>,
 }
 
 /// metadata extension
