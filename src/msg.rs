@@ -41,6 +41,8 @@ pub struct InitMsg {
 
     /// The list of addreses to divide up on initial mint
     pub mint_funds_distribution_info: Option<RoyaltyInfo>,
+
+    pub nfts: String
 }
 
 /// This type represents optional configuration values.

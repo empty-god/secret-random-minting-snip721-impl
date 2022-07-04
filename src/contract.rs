@@ -7,12 +7,12 @@ use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use primitive_types::U256;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
-
+use std::collections::HashSet;
 use secret_toolkit::{
     permit::{validate, Permit, RevokedPermits},
     utils::{pad_handle_result, pad_query_result},
 };
-use crate::state::NFT_ARCHIVE;
+use crate::{state::NFT_ARCHIVE, token::Trait, mint_run::SerialNumber};
 
 use crate::expiration::Expiration;
 use crate::inventory::{Inventory, InventoryIter};
@@ -707,19 +707,20 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
             external_url: Some(swap_data[num]),
             description: None,
             name: Some(swap_data[num]),
-            attributes: Some(Attributes {
-                test: None,
-            }),
+            attributes: Some(vec![
+                Trait {
+                    display_type: Some("test".to_string()),
+                    trait_type: Some("test2".to_string()),
+                    value: "00".to_string(),
+                    max_value: Some("10".to_string())
+                }
+            ]),
             background_color: None,
             animation_url: None,
             youtube_url: None,
             media: None,
             protected_attributes: None,
-        }),
-        protected_attributes: todo!(),
-        media: todo!(),
-        youtube_url: todo!(),
-        animation_url: todo!(),
+        })
     });
     let private_metadata = Some(Metadata {
         token_uri: None,
@@ -746,10 +747,14 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         }),
     });
 
-    let serial_number = Some("0001001010");
+    let serial_number = Some(SerialNumber{
+        serial_number: u32::from(num),
+        quantity_minted_this_run: None,
+        mint_run: None
+    });
     let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
     let memo = None;
-    let token_id: Option<String> = Some(num);
+    let token_id: Option<String> = Some(num.to_string());
 
     //Set variables for response logs
     let url_str = format!("{} ", token_data.priv_img_url.clone());
@@ -772,7 +777,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         data: Some(to_binary(&HandleAnswer::MintNft {
             token_id: minted_str,
         })?),
-    });
+    })
 }
 /// Returns HandleResult
 ///
