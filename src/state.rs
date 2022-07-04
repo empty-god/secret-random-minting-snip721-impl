@@ -1,5 +1,5 @@
-use std::any::type_name;
 use schemars::JsonSchema;
+use std::any::type_name;
 
 use cosmwasm_std::{Api, BlockInfo, CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
@@ -465,21 +465,16 @@ pub struct ReceiveRegistration {
     pub impl_batch: bool,
 }
 
-
 /// Preloaded data storage for the tokens during init
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
-pub struct  PreLoad {
+pub struct PreLoad {
     pub id: String,
     pub img_url: String,
     pub priv_img_url: String,
-    pub attributes : Option<Vec<Trait>>,
+    pub attributes: Option<Vec<Trait>>,
     pub priv_attributes: Option<Vec<Trait>>,
     pub priv_key: String,
 }
-
-
-
-
 
 /// Returns StdResult<()> resulting from saving an item to storage
 ///
