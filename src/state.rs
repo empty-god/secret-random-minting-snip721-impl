@@ -78,16 +78,6 @@ pub const PREFIX_MINT_RUN_NUM: &[u8] = b"runnum";
 /// prefix for the storage of revoked permits
 pub const PREFIX_REVOKED_PERMITS: &str = "revoke";
 
-/// log for avaliable nfts
-pub const NFT_ARCHIVE: &[u8] = b"nftimages";
-
-#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
-pub struct NftArchive {
-    /// array of avaliable nfts
-    pub nfts: Vec<String>
-}
-
-
 /// Token contract config
 #[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
 pub struct Config {
@@ -478,12 +468,13 @@ pub struct ReceiveRegistration {
 /// Preloaded data storage for the tokens during init
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub struct PreLoad {
-    pub id: String,
+    pub name: String,
     pub img_url: String,
-    pub priv_img_url: String,
+    pub date: String,
+    pub edition: String,
+    pub description: String,
+    pub dna: String,
     pub attributes: Option<Vec<Trait>>,
-    pub priv_attributes: Option<Vec<Trait>>,
-    pub priv_key: String,
 }
 
 /// Returns StdResult<()> resulting from saving an item to storage

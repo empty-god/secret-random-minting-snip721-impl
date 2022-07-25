@@ -1,0 +1,11 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/admin/Documents/secret-random-minting-snip721-impl'
+cargo clippy
+cargo test
+RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown --locked
+# The following line is not necessary, may work only on linux (extra size optimization)
+wasm-opt -Oz ./target/wasm32-unknown-unknown/release/*.wasm -o ./contract.wasm
+make: Leaving directory `/Users/admin/Documents/secret-random-minting-snip721-impl'
+ 
+make: *** No rule to make target `contract.wasm', needed by `contract.wasm.gz'.
+

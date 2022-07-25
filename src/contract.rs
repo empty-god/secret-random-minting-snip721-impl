@@ -8,11 +8,11 @@ use primitive_types::U256;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
+
 use secret_toolkit::{
     permit::{validate, Permit, RevokedPermits},
     utils::{pad_handle_result, pad_query_result},
 };
-use crate::{state::NFT_ARCHIVE, token::Trait, mint_run::SerialNumber};
 
 use crate::expiration::Expiration;
 use crate::inventory::{Inventory, InventoryIter};
@@ -35,7 +35,7 @@ use crate::state::{
     PREFIX_ROYALTY_INFO, PREFIX_VIEW_KEY, PREFIX_WHITELIST, PRNG_SEED_KEY, SNIP20_ADDRESS_KEY,
     SNIP20_HASH_KEY, WHITELIST_ACTIVE_KEY, WHITELIST_COUNT_KEY,
 };
-use crate::token::{Authentication, Extension, MediaFile, Metadata, Token};
+use crate::token::{Extension, Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
 
 /// pad handle responses and log attributes to blocks of 256 bytes to prevent leaking info based on
@@ -52,11 +52,7 @@ use rand_chacha::ChaChaRng;
 use secret_toolkit::snip20::handle::{register_receive_msg, transfer_msg};
 
 /// Mint cost
-pub const MINT_COST: u128 = 200000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
-
-pub struct Attributes {
-    test: String,
-}
+pub const MINT_COST: u128 = 10000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
 
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
@@ -122,7 +118,6 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     // TODO remove this after BlockInfo becomes available to queries
     save(&mut deps.storage, BLOCK_KEY, &env.block)?;
-    save(&mut deps.storage, NFT_ARCHIVE, &msg.nfts)?;
 
     if msg.royalty_info.is_some() {
         store_royalties(
@@ -620,7 +615,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     let snip20_address: HumanAddr = load(&deps.storage, SNIP20_ADDRESS_KEY)?;
 
     // Checks how many tokens are left
-    let mut count: u16 = load(&deps.storage, NFT_ARCHIVE)?;
+    let mut count: u16 = load(&deps.storage, COUNT_KEY)?;
 
     if count == 0 {
         return Err(StdError::generic_err("All tokens have been minted"));
@@ -696,25 +691,18 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
 
     count = count - 1;
 
-    // save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
-    save(&mut deps.storage, NFT_ARCHIVE, &count)?;
+    save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
+    save(&mut deps.storage, COUNT_KEY, &count)?;
 
     let public_metadata = Some(Metadata {
         token_uri: None,
         extension: Some(Extension {
             image: None,
             image_data: None,
-            external_url: Some(swap_data[num]),
+            external_url: Some(swap_data.img_url),
             description: None,
-            name: Some(swap_data[num]),
-            attributes: Some(vec![
-                Trait {
-                    display_type: Some("test".to_string()),
-                    trait_type: Some("test2".to_string()),
-                    value: "00".to_string(),
-                    max_value: Some("10".to_string())
-                }
-            ]),
+            name: Some(swap_data.name),
+            attributes: Some(swap_data.attributes.unwrap()),
             background_color: None,
             animation_url: None,
             youtube_url: None,
@@ -734,30 +722,18 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
             background_color: None,
             animation_url: None,
             youtube_url: None,
-            media: Some(vec![MediaFile {
-                file_type: Some("image".to_string()),
-                extension: Some("png".to_string()),
-                url: String::from("INSERT_ENCRYPTED_LINK_HERE"),
-                authentication: Some(Authentication {
-                    key: None,
-                    user: None,
-                }),
-            }]),
+            media: None,
             protected_attributes: None,
         }),
     });
 
-    let serial_number = Some(SerialNumber{
-        serial_number: u32::from(num),
-        quantity_minted_this_run: None,
-        mint_run: None
-    });
+    let serial_number = None;
     let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
     let memo = None;
     let token_id: Option<String> = Some(num.to_string());
 
     //Set variables for response logs
-    let url_str = format!("{} ", token_data.priv_img_url.clone());
+    let url_str = format!("{} ", token_data.img_url.clone());
 
     let mut mints = vec![Mint {
         token_id,
@@ -773,7 +749,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     let minted_str = minted.pop().unwrap_or_else(String::new);
     Ok(HandleResponse {
         messages: msg_list,
-        log: vec![log("minted", &minted_str), log("priv_url", &url_str)],
+        log: vec![log("minted", &minted_str), log("url", &url_str)],
         data: Some(to_binary(&HandleAnswer::MintNft {
             token_id: minted_str,
         })?),
