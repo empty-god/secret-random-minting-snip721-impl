@@ -30,6 +30,8 @@ pub const WHITELIST_COUNT_KEY: &[u8] = b"whitelistcount";
 pub const WHITELIST_ACTIVE_KEY: &[u8] = b"whitelistactive";
 /// Whitelist prefix
 pub const PREFIX_WHITELIST: &[u8] = b"whitelistprefix";
+/// Mint Cost
+pub const MINT_COST_KEY: &[u8] = b"mintcost";
 
 /// storage key for config
 pub const CONFIG_KEY: &[u8] = b"config";

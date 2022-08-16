@@ -14,7 +14,7 @@ use secret_toolkit::{
     utils::{pad_handle_result, pad_query_result},
 };
 
-use crate::expiration::Expiration;
+use crate::{expiration::Expiration, state::MINT_COST_KEY};
 use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::StoredMintRunInfo;
 use crate::msg::{
@@ -52,7 +52,7 @@ use rand_chacha::ChaChaRng;
 use secret_toolkit::snip20::handle::{register_receive_msg, transfer_msg};
 
 /// Mint cost
-pub const MINT_COST: u128 = 10000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
+pub const MINT_COST: u128 = 1250000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
 
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
@@ -101,6 +101,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         burn_is_enabled: init_config.enable_burn.unwrap_or(false),
     };
 
+    let mint_cost: u128 = msg.mint_cost;
     let snip20_hash: String = msg.snip20_hash;
     let snip20_address: HumanAddr = msg.snip20_address;
     let count: u16 = 0;
@@ -115,6 +116,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, COUNT_KEY, &count)?;
     save(&mut deps.storage, WHITELIST_ACTIVE_KEY, &false)?;
     save(&mut deps.storage, WHITELIST_COUNT_KEY, &whitecount)?;
+    save(&mut deps.storage, MINT_COST_KEY, &mint_cost)?;
 
     // TODO remove this after BlockInfo becomes available to queries
     save(&mut deps.storage, BLOCK_KEY, &env.block)?;
@@ -188,6 +190,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             msg,
         } => receive(deps, env, sender, from, amount, msg),
+        HandleMsg::UpdateCost { cost } => update_cost(deps, env, &config, cost),
         HandleMsg::PreLoad { new_data } => pre_load(deps, env, &config, new_data),
         HandleMsg::LoadWhitelist { whitelist } => load_whitelist(deps, env, &config, whitelist),
         HandleMsg::DeactivateWhitelist {} => deactivate_whitelist(deps, env, &config),
@@ -454,6 +457,7 @@ pub fn receive<S: Storage, A: Api, Q: Querier>(
     msg: Option<Binary>,
 ) -> HandleResult {
     let snip20_address: HumanAddr = load(&deps.storage, SNIP20_ADDRESS_KEY)?;
+    let mint_cost: u128 = load(&deps.storage, MINT_COST_KEY)?;
 
     if env.message.sender != snip20_address {
         return Err(StdError::generic_err(
@@ -461,7 +465,7 @@ pub fn receive<S: Storage, A: Api, Q: Querier>(
         ));
     }
 
-    if amount.u128() != MINT_COST {
+    if amount.u128() != mint_cost {
         return Err(StdError::generic_err(
             "You have attempted to send the wrong amount of tokens",
         ));
@@ -484,6 +488,33 @@ pub fn receive<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+/// Lets Admin update the mint cost
+pub fn update_cost<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    config: &Config,
+    cost: u128,
+) -> HandleResult {
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+
+    if config.admin != sender_raw {
+        return Err(StdError::generic_err(
+            "This function is only usable by the Admin",
+        ));
+    }
+
+    let mint_cost: u128 = load(&deps.storage, MINT_COST_KEY)?;
+
+    if mint_cost == cost {
+        return Err(StdError::generic_err(
+            "The mint cost is already set to this value",
+        ));
+    }
+
+    save(&mut deps.storage, MINT_COST_KEY, &cost)?;
+
+    Ok(HandleResponse::default())
+}
 /// Lets Admin load metadata used in random minting
 pub fn pre_load<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -657,6 +688,8 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_MINT_FUNDS_DISTRIBUTION_KEY)?
             .unwrap();
 
+    let mint_cost: u128 = load(&deps.storage, MINT_COST_KEY)?;
+
     // Contract callback hash
     let callback_code_hash: String = load(&deps.storage, &SNIP20_HASH_KEY)?;
     let padding = None;
@@ -665,7 +698,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     for royalty in royalty_list.royalties.iter() {
         let decimal_places: u32 = royalty_list.decimal_places_in_rates.into();
         let rate: u128 = (royalty.rate as u128) * (10 as u128).pow(decimal_places);
-        let amount = Uint128((MINT_COST * rate) / (100 as u128).pow(decimal_places));
+        let amount = Uint128((mint_cost * rate) / (100 as u128).pow(decimal_places));
         let recipient = deps.api.human_address(&royalty.recipient).unwrap();
         let cosmos_msg = transfer_msg(
             recipient,
@@ -697,10 +730,10 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     let public_metadata = Some(Metadata {
         token_uri: None,
         extension: Some(Extension {
-            image: None,
+            image:  Some(swap_data.img_url),
             image_data: None,
-            external_url: Some(swap_data.img_url),
-            description: None,
+            external_url: None,
+            description: Some(swap_data.description),
             name: Some(swap_data.name),
             attributes: Some(swap_data.attributes.unwrap()),
             background_color: None,
