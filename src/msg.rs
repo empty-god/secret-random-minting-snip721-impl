@@ -40,11 +40,7 @@ pub struct InitMsg {
     pub snip20_address: HumanAddr,
 
     /// The list of addreses to divide up on initial mint
-    pub mint_funds_distribution_info: Option<RoyaltyInfo>,
-
-    pub nfts: String,
-
-    pub mint_cost: u128
+    pub mint_funds_distribution_info: Option<RoyaltyInfo>
 }
 
 /// This type represents optional configuration values.
@@ -130,8 +126,6 @@ pub enum HandleMsg {
         #[serde(default)]
         msg: Option<Binary>,
     },
-    /// Update mint cost 
-    UpdateCost { cost: u128 },
     /// Preloads metadata for random mints
     PreLoad { new_data: Vec<PreLoad> },
     /// Preloads whitelist data

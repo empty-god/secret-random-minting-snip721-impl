@@ -14,8 +14,7 @@ use secret_toolkit::{
     utils::{pad_handle_result, pad_query_result},
 };
 
-use crate::{expiration::Expiration, state::MINT_COST_KEY};
-use crate::inventory::{Inventory, InventoryIter};
+use crate::{inventory::{Inventory, InventoryIter}, state::MINT_COST_KEY, expiration::Expiration, token::MediaFile};
 use crate::mint_run::StoredMintRunInfo;
 use crate::msg::{
     AccessLevel, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse, HandleAnswer,
@@ -101,7 +100,6 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         burn_is_enabled: init_config.enable_burn.unwrap_or(false),
     };
 
-    let mint_cost: u128 = msg.mint_cost;
     let snip20_hash: String = msg.snip20_hash;
     let snip20_address: HumanAddr = msg.snip20_address;
     let count: u16 = 0;
@@ -116,7 +114,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, COUNT_KEY, &count)?;
     save(&mut deps.storage, WHITELIST_ACTIVE_KEY, &false)?;
     save(&mut deps.storage, WHITELIST_COUNT_KEY, &whitecount)?;
-    save(&mut deps.storage, MINT_COST_KEY, &mint_cost)?;
+    save(&mut deps.storage, MINT_COST_KEY, &MINT_COST)?;
 
     // TODO remove this after BlockInfo becomes available to queries
     save(&mut deps.storage, BLOCK_KEY, &env.block)?;
@@ -190,7 +188,6 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             msg,
         } => receive(deps, env, sender, from, amount, msg),
-        HandleMsg::UpdateCost { cost } => update_cost(deps, env, &config, cost),
         HandleMsg::PreLoad { new_data } => pre_load(deps, env, &config, new_data),
         HandleMsg::LoadWhitelist { whitelist } => load_whitelist(deps, env, &config, whitelist),
         HandleMsg::DeactivateWhitelist {} => deactivate_whitelist(deps, env, &config),
@@ -488,33 +485,6 @@ pub fn receive<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-/// Lets Admin update the mint cost
-pub fn update_cost<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    config: &Config,
-    cost: u128,
-) -> HandleResult {
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-
-    if config.admin != sender_raw {
-        return Err(StdError::generic_err(
-            "This function is only usable by the Admin",
-        ));
-    }
-
-    let mint_cost: u128 = load(&deps.storage, MINT_COST_KEY)?;
-
-    if mint_cost == cost {
-        return Err(StdError::generic_err(
-            "The mint cost is already set to this value",
-        ));
-    }
-
-    save(&mut deps.storage, MINT_COST_KEY, &cost)?;
-
-    Ok(HandleResponse::default())
-}
 /// Lets Admin load metadata used in random minting
 pub fn pre_load<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -727,6 +697,8 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
     save(&mut deps.storage, COUNT_KEY, &count)?;
 
+    let url = swap_data.img_url.clone();
+
     let public_metadata = Some(Metadata {
         token_uri: None,
         extension: Some(Extension {
@@ -739,7 +711,14 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
             background_color: None,
             animation_url: None,
             youtube_url: None,
-            media: None,
+            media: Some(vec![ 
+                MediaFile {
+                    file_type: Some("image".to_string()),
+                    extension: Some(".png".to_string()),
+                    url: url,
+                    authentication: None
+                }
+            ]),
             protected_attributes: None,
         })
     });
