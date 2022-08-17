@@ -51,7 +51,7 @@ use rand_chacha::ChaChaRng;
 use secret_toolkit::snip20::handle::{register_receive_msg, transfer_msg};
 
 /// Mint cost
-pub const MINT_COST: u128 = 1250000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
+pub const MINT_COST: u128 = 125000000; //WRITE IN LOWEST DENOMINATION OF YOUR PREFERRED SNIP
 
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
