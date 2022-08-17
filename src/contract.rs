@@ -697,17 +697,17 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
     save(&mut deps.storage, COUNT_KEY, &count)?;
 
-    let url = swap_data.img_url.clone();
+    let url = token_data.img_url.clone();
 
     let public_metadata = Some(Metadata {
         token_uri: None,
         extension: Some(Extension {
-            image:  Some(swap_data.img_url),
+            image:  Some(token_data.img_url),
             image_data: None,
             external_url: None,
-            description: Some(swap_data.description),
-            name: Some(swap_data.name),
-            attributes: Some(swap_data.attributes.unwrap()),
+            description: Some(token_data.description),
+            name: Some(token_data.name),
+            attributes: Some(token_data.attributes.unwrap()),
             background_color: None,
             animation_url: None,
             youtube_url: None,
