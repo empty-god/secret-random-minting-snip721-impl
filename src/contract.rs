@@ -702,6 +702,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
 
     let log_url = token_data.img_url.clone();
     let metadata_url = token_data.img_url.clone();
+    let token_id_clone = token_data.name.clone();
 
     let public_metadata = Some(Metadata {
         token_uri: None,
@@ -746,7 +747,8 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     let serial_number = None;
     let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
     let memo = None;
-    let token_id: Option<String> = Some(num.to_string());
+    let token_hash_index = token_id_clone.find('#').unwrap();
+    let token_id: Option<String> = Some((token_id_clone[token_hash_index + 1..]).to_string());
 
     //Set variables for response logs
     let url_str = format!("{} ", log_url);
@@ -802,7 +804,7 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         // Pull random token data for minting then remove from data pool
         let random_seed = new_entropy(&env, prng_seed.as_ref(), prng_seed.as_ref());
         let mut rng = ChaChaRng::from_seed(random_seed);
-
+        
         let num = (rng.next_u32() % (count as u32)) as u16 + 1; // an id number between 1 and count
 
         let token_data: PreLoad = load(&deps.storage, &num.to_le_bytes())?;
@@ -814,6 +816,7 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         save(&mut deps.storage, COUNT_KEY, &count)?;
 
         let metadata_url = token_data.img_url.clone();
+        let token_id_clone = token_data.name.clone();
 
         let public_metadata = Some(Metadata {
             token_uri: None,
@@ -858,7 +861,8 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         let serial_number = None;
         let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
         let memo = None;
-        let token_id: Option<String> = Some(num.to_string());
+        let token_hash_index = token_id_clone.find('#').unwrap();
+        let token_id: Option<String> = Some((token_id_clone[token_hash_index + 1..]).to_string());
 
 
         mints.push(Mint {
@@ -872,7 +876,6 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         });
     };
 
-    
     let minted = mint_list(deps, &env, config, &sender_raw, &mut mints)?;
     Ok(HandleResponse {
         messages: vec![],

@@ -787,7 +787,6 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-sgx-vm",
  "hex",
- "libc",
  "primitive-types",
  "rand",
  "rand_chacha",

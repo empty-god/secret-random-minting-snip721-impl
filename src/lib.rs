@@ -11,7 +11,6 @@ pub mod state;
 pub mod token;
 mod utils;
 mod viewing_key;
-mod unittest_handles;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
