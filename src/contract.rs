@@ -7,7 +7,7 @@ use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use primitive_types::U256;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
-use std::collections::HashSet;
+use std::{collections::HashSet, u8};
 
 use secret_toolkit::{
     permit::{validate, Permit, RevokedPermits},
@@ -205,6 +205,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             public_metadata,
             private_metadata,
         ),
+        HandleMsg::BatchMintNfts {
+            mint_counts
+        } => batch_mint(deps, env, &mut config, mint_counts),
         HandleMsg::SetRoyaltyInfo {
             token_id,
             royalty_info,
@@ -697,7 +700,8 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
     save(&mut deps.storage, COUNT_KEY, &count)?;
 
-    let url = token_data.img_url.clone();
+    let log_url = token_data.img_url.clone();
+    let metadata_url = token_data.img_url.clone();
 
     let public_metadata = Some(Metadata {
         token_uri: None,
@@ -715,7 +719,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
                 MediaFile {
                     file_type: Some("image".to_string()),
                     extension: Some(".png".to_string()),
-                    url: url,
+                    url: metadata_url,
                     authentication: None
                 }
             ]),
@@ -745,7 +749,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     let token_id: Option<String> = Some(num.to_string());
 
     //Set variables for response logs
-    let url_str = format!("{} ", token_data.img_url.clone());
+    let url_str = format!("{} ", log_url);
 
     let mut mints = vec![Mint {
         token_id,
@@ -764,6 +768,117 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         log: vec![log("minted", &minted_str), log("url", &url_str)],
         data: Some(to_binary(&HandleAnswer::MintNft {
             token_id: minted_str,
+        })?),
+    })
+}
+
+pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    config: &mut Config,
+    mint_counts: u8,
+) -> HandleResult {
+    check_status(config.status, 2)?;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    if config.admin != sender_raw {
+        return Err(StdError::generic_err(
+            "Only admin are allowed to batch mint",
+        ));
+    }
+
+    // Checks how many tokens are left
+    let init_count: u16 = load(&deps.storage, COUNT_KEY)?;
+
+    if init_count == 0 || init_count < mint_counts.into() {
+        return Err(StdError::generic_err("All tokens have been minted or not enough tokens left to mint"));
+    }
+
+    let prng_seed: Vec<u8> = load(&deps.storage, PRNG_SEED_KEY)?;
+    let mut mints: Vec<Mint> = vec![];
+
+    for _ in 0..mint_counts {
+        let mut count: u16 = load(&deps.storage, COUNT_KEY)?;
+        let sender = deps.api.human_address(&sender_raw)?;
+        // Pull random token data for minting then remove from data pool
+        let random_seed = new_entropy(&env, prng_seed.as_ref(), prng_seed.as_ref());
+        let mut rng = ChaChaRng::from_seed(random_seed);
+
+        let num = (rng.next_u32() % (count as u32)) as u16 + 1; // an id number between 1 and count
+
+        let token_data: PreLoad = load(&deps.storage, &num.to_le_bytes())?;
+        let swap_data: PreLoad = load(&deps.storage, &count.to_le_bytes())?;
+
+        count = count - 1;
+
+        save(&mut deps.storage, &num.to_le_bytes(), &swap_data)?;
+        save(&mut deps.storage, COUNT_KEY, &count)?;
+
+        let metadata_url = token_data.img_url.clone();
+
+        let public_metadata = Some(Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                image:  Some(token_data.img_url),
+                image_data: None,
+                external_url: None,
+                description: Some(token_data.description),
+                name: Some(token_data.name),
+                attributes: Some(token_data.attributes.unwrap()),
+                background_color: None,
+                animation_url: None,
+                youtube_url: None,
+                media: Some(vec![ 
+                    MediaFile {
+                        file_type: Some("image".to_string()),
+                        extension: Some(".png".to_string()),
+                        url: metadata_url,
+                        authentication: None
+                    }
+                ]),
+                protected_attributes: None,
+            })
+        });
+        let private_metadata = Some(Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                image: None,
+                image_data: None,
+                external_url: None,
+                description: None,
+                name: None,
+                attributes: None,
+                background_color: None,
+                animation_url: None,
+                youtube_url: None,
+                media: None,
+                protected_attributes: None,
+            }),
+        });
+
+        let serial_number = None;
+        let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
+        let memo = None;
+        let token_id: Option<String> = Some(num.to_string());
+
+
+        mints.push(Mint {
+            token_id,
+            owner: Some(sender),
+            public_metadata,
+            private_metadata,
+            serial_number,
+            royalty_info,
+            memo,
+        });
+    };
+
+    
+    let minted = mint_list(deps, &env, config, &sender_raw, &mut mints)?;
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![log("minted", format!("{:?}", &minted))],
+        data: Some(to_binary(&HandleAnswer::BatchMintNft {
+            token_ids: minted,
         })?),
     })
 }

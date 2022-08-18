@@ -130,6 +130,10 @@ pub enum HandleMsg {
     PreLoad { new_data: Vec<PreLoad> },
     /// Preloads whitelist data
     LoadWhitelist { whitelist: Vec<HumanAddr> },
+    /// Batch Mint
+    BatchMintNfts {
+        mint_counts: u8,
+    },
     /// Deactivates whitelist
     DeactivateWhitelist {},
     /// set the public and/or private metadata.  This can be called by either the token owner or
