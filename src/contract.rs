@@ -91,7 +91,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         tx_cnt: 0,
         token_cnt: 0,
         status: ContractStatus::Normal.to_u8(),
-        token_supply_is_public: init_config.public_token_supply.unwrap_or(false),
+        token_supply_is_public: init_config.public_token_supply.unwrap_or(true),
         owner_is_public: init_config.public_owner.unwrap_or(false),
         sealed_metadata_is_enabled: init_config.enable_sealed_metadata.unwrap_or(false),
         unwrap_to_private: init_config.unwrapped_metadata_is_private.unwrap_or(false),
@@ -702,7 +702,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
 
     let log_url = token_data.img_url.clone();
     let metadata_url = token_data.img_url.clone();
-    let token_id_clone = token_data.name.clone();
+    let token_id_clone = token_data.edition.clone();
 
     let public_metadata = Some(Metadata {
         token_uri: None,
@@ -747,8 +747,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     let serial_number = None;
     let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
     let memo = None;
-    let token_hash_index = token_id_clone.find('#').unwrap();
-    let token_id: Option<String> = Some((token_id_clone[token_hash_index + 1..]).to_string());
+    let token_id: Option<String> = Some(token_id_clone);
 
     //Set variables for response logs
     let url_str = format!("{} ", log_url);
@@ -798,11 +797,11 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
     let prng_seed: Vec<u8> = load(&deps.storage, PRNG_SEED_KEY)?;
     let mut mints: Vec<Mint> = vec![];
 
-    for _ in 0..mint_counts {
+    for iteration in 0..mint_counts {
         let mut count: u16 = load(&deps.storage, COUNT_KEY)?;
         let sender = deps.api.human_address(&sender_raw)?;
         // Pull random token data for minting then remove from data pool
-        let random_seed = new_entropy(&env, prng_seed.as_ref(), prng_seed.as_ref());
+        let random_seed = new_entropy(&env, prng_seed.as_ref(), iteration.to_string().as_ref());
         let mut rng = ChaChaRng::from_seed(random_seed);
         
         let num = (rng.next_u32() % (count as u32)) as u16 + 1; // an id number between 1 and count
@@ -816,7 +815,7 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         save(&mut deps.storage, COUNT_KEY, &count)?;
 
         let metadata_url = token_data.img_url.clone();
-        let token_id_clone = token_data.name.clone();
+        let token_id_clone = token_data.edition.clone();
 
         let public_metadata = Some(Metadata {
             token_uri: None,
@@ -861,8 +860,7 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         let serial_number = None;
         let royalty_info = Some((may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?.unwrap()).to_human_old(&deps.api)?);
         let memo = None;
-        let token_hash_index = token_id_clone.find('#').unwrap();
-        let token_id: Option<String> = Some((token_id_clone[token_hash_index + 1..]).to_string());
+        let token_id: Option<String> = Some(token_id_clone);
 
 
         mints.push(Mint {
